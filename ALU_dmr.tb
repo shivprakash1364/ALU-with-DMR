@@ -1,0 +1,84 @@
+`timescale 1ns / 1ps
+
+module tb_dmr_alu;
+
+    parameter WIDTH = 8;
+
+    // Inputs
+    reg  [WIDTH-1:0] A;
+    reg  [WIDTH-1:0] B;
+    reg  [2:0]       Opcode;
+
+    // Outputs
+    wire [WIDTH-1:0] Final_Result;
+    wire             Error_Flag;
+
+    // Instantiate DUT
+    dmr_alu #(.WIDTH(WIDTH)) uut (
+        .A(A),
+        .B(B),
+        .Opcode(Opcode),
+        .Final_Result(Final_Result),
+        .Error_Flag(Error_Flag)
+    );
+
+
+    initial begin
+        $dumpfile("dmr_alu_waveform.vcd");   // VCD file
+        $dumpvars(0, tb_dmr_alu);            // Dump all signals
+    end
+
+
+    initial begin
+
+      $display("***** DMR ALU STARTED *****");
+
+      $monitor("T=%0t | A=%0d B=%0d Op=%b | R1=%0d R2=%0d | Final=%0d | Err=%b",
+                $time, A, B, Opcode, uut.result_1, uut.result_2, Final_Result, Error_Flag);
+
+        // -------------------------------
+        // 1. Normal Operation
+        // -------------------------------
+        A = 0; B = 0; Opcode = 0;
+        #10;
+
+        A = 10; B = 5; Opcode = 3'b000;   // ADD
+        #10;
+
+        A = 20; B = 10; Opcode = 3'b001;  // SUB
+        #10;
+
+        A = 8'b10101010; B = 8'b00001111; Opcode = 3'b010; // AND
+        #10;
+
+
+        // 2. Fault Injection
+
+        $display("\n--- Injecting Stuck-at Fault in ALU 2 ---");
+
+        // Fault Model:
+      // 'Stuck-at-0' fault simulation on one of the output bit(index=3)
+       force uut.ALU_INSTANCE_2.Result[6] = 1'b0;
+
+        A = 50; B = 50; Opcode = 3'b000;  // ADD: mismatch expected
+        #10;
+
+        if (Error_Flag)
+          $display(">>> Fault detected successflly.");
+        else
+            $display(">>> Fault NOT detected.");
+
+
+        // 3. Fault Removal
+
+        $display("\n--- Releasing Fault ---");
+        release uut.ALU_INSTANCE_2.Result[3];
+
+        A = 5; B = 5; Opcode = 3'b000;    // ADD: normal again
+        #10;
+
+      $display("\n***** SIMULATION COMPLETED *****");
+        $finish;
+    end
+
+endmodule
